@@ -1,0 +1,30 @@
+# The runtime directory is the one thing this repository decides on its own, so it is the
+# one thing checked without a bus. The round trip needs a built encoder, a built display
+# and a live iceoryx2, so it runs from a desk rather than here; proof/roundtrip.py records
+# what it measured and README.md carries the numbers.
+name: checks
+on: [push, pull_request]
+
+jobs:
+  runtime-dir:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: The scripts parse and the runtime directory resolves
+        run: |
+          python -m py_compile scripts/runtime_dir.py scripts/up.py proof/roundtrip.py
+          python scripts/runtime_dir.py run
+          python scripts/runtime_dir.py temp
+          python scripts/runtime_dir.py root
+      - name: An explicit override is honoured
+        shell: bash
+        run: |
+          set -eux
+          out=$(CINEFORM_RUNTIME_DIR=/tmp/cineform-check python scripts/runtime_dir.py run)
+          test "$out" = "/tmp/cineform-check"

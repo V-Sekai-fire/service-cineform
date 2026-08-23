@@ -1,0 +1,9 @@
+thirdparty/
+interactor-cineform/
+transport-cineform-tui/
+build/
+.repo/
+__pycache__/
+run/
+*.mkv
+*.raw

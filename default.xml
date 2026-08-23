@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <remote name="weftspun" fetch="https://github.com/weftspun" />
+  <remote name="v-sekai-fabric" fetch="https://github.com/v-sekai-fabric" />
+  <remote name="laurencelundblade" fetch="https://github.com/laurencelundblade" />
+  <default remote="weftspun" sync-j="4" />
+
+  <project name="iceoryx2" path="thirdparty/iceoryx2"
+           revision="035befa7fad6d8e13208654db76844912119f55f" />
+  <project name="contract-bus" path="thirdparty/harness" remote="v-sekai-fabric"
+           revision="f9f1ddcd93412a51ba7f161e8c4f3eeeb1ebc3aa" />
+  <project name="QCBOR" path="thirdparty/harness/libs/qcbor" remote="laurencelundblade"
+           revision="refs/tags/v1.6.1" />
+  <project name="interactor-cineform" path="interactor-cineform" revision="main" />
+  <project name="transport-cineform-tui" path="transport-cineform-tui" revision="main" />
+</manifest>

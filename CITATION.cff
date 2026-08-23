@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+title: "service-cineform: the CineForm encode service"
+message: "If you use this software, please cite it as below."
+type: software
+authors:
+  - given-names: Ernest
+    family-names: Lee
+    email: ernest.lee@chibifire.com
+license: Apache-2.0 OR MIT
+repository-code: "https://github.com/weftspun/service-cineform"
+
+abstract: >-
+  Stands up the iceoryx2 bus and interactor-cineform on one shared-memory host, in a runtime directory the service owns.

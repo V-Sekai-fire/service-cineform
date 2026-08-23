@@ -6,9 +6,9 @@
   <default remote="weftspun" sync-j="4" />
 
   <project name="iceoryx2" path="thirdparty/iceoryx2"
-           revision="035befa7fad6d8e13208654db76844912119f55f" />
+           revision="a1909f56e30c16b1492e829313389b9439811323" />
   <project name="contract-bus" path="thirdparty/harness" remote="v-sekai-fabric"
-           revision="f9f1ddcd93412a51ba7f161e8c4f3eeeb1ebc3aa" />
+           revision="4340ea34394e20b832d9efad66117cae2da2ce7a" />
   <project name="QCBOR" path="thirdparty/harness/libs/qcbor" remote="laurencelundblade"
            revision="refs/tags/v1.6.1" />
   <project name="interactor-cineform" path="interactor-cineform" revision="main" />

@@ -23,8 +23,18 @@ jobs:
           python scripts/runtime_dir.py temp
           python scripts/runtime_dir.py root
       - name: An explicit override is honoured
-        shell: bash
+        # In Python, not bash. Git Bash on Windows rewrites an argument that looks like a
+        # POSIX path before the process ever sees it, so `CINEFORM_RUNTIME_DIR=/tmp/x`
+        # arrived as `C:\Users\RUNNER~1\AppData\Local\Temp\x` and the comparison failed
+        # against a value nothing in this repository chose. The check was wrong, not the
+        # code it was checking.
         run: |
-          set -eux
-          out=$(CINEFORM_RUNTIME_DIR=/tmp/cineform-check python scripts/runtime_dir.py run)
-          test "$out" = "/tmp/cineform-check"
+          python -c "
+          import os, pathlib, subprocess, sys
+          want = pathlib.Path(os.getcwd()) / 'cineform-check-override'
+          env = dict(os.environ, CINEFORM_RUNTIME_DIR=str(want))
+          got = subprocess.run([sys.executable, 'scripts/runtime_dir.py', 'run'],
+                               capture_output=True, text=True, env=env, check=True).stdout.strip()
+          assert got == str(want), f'override ignored: wanted {want}, got {got}'
+          print('ok  ', got)
+          "

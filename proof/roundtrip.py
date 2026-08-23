@@ -81,6 +81,76 @@ def decode_to_uncompressed(source: pathlib.Path, dest: pathlib.Path) -> None:
     ])
 
 
+def build_godot_stream(video: pathlib.Path, dest: pathlib.Path, frames: int, width: int,
+                       height: int, rate: int, fps: int, channels: int) -> pathlib.Path:
+    """Interleaves pixels and audio the way Godot's MovieWriter hands them over.
+
+    Each frame's pixels are followed by that frame's audio block: rate/fps int32 samples per
+    channel, integer division, which is Godot's own arithmetic. The tone is generated rather
+    than taken from the source, for two reasons -- it is deterministic in the sample index
+    alone, so the expected value can be recomputed at compare time without keeping a second
+    copy, and a different frequency per channel makes a channel swap detectable where a
+    single tone on both would not.
+    """
+    per_frame = rate // fps
+    frame_bytes = width * height * 4
+    with video.open("rb") as v, dest.open("wb") as out:
+        index = 0
+        for _ in range(frames):
+            pixels = v.read(frame_bytes)
+            if len(pixels) != frame_bytes:
+                break
+            out.write(pixels)
+            block = bytearray()
+            for i in range(per_frame):
+                for c in range(channels):
+                    block += struct.pack("<i", expected_sample(index + i, c, rate))
+            out.write(block)
+            index += per_frame
+    return dest
+
+
+def expected_sample(index: int, channel: int, rate: int) -> int:
+    """The int32 the encoder is handed. Godot's convention: a 16-bit value in the top bits."""
+    hz = 440.0 if channel == 0 else 660.0
+    return int(math.sin(2.0 * math.pi * hz * index / rate) * 30000.0) << 16
+
+
+def compare_audio(decoded: pathlib.Path, frames: int, rate: int, fps: int, channels: int,
+                  abits: int):
+    """Every decoded sample against the tone that produced it.
+
+    UNCOMPRESSED, SO THE BAR IS EXACT. Unlike the video comparison, which reports how lossy
+    CineForm is and asserts nothing about the figure, a single differing sample here is a
+    defect. PCM that is not bit-identical has been mangled by the muxer or the depth
+    conversion, and there is no third possibility to allow for.
+    """
+    per_frame = rate // fps
+    want_count = per_frame * frames * channels
+    data = decoded.read_bytes()
+    fmt = "<%dh" % (len(data) // 2) if abits == 16 else "<%di" % (len(data) // 4)
+    got = struct.unpack(fmt, data[: (len(data) // (abits // 8)) * (abits // 8)])
+
+    shift = 32 - abits
+    differing = 0
+    worst = 0
+    index = 0
+    k = 0
+    for _ in range(frames):
+        for i in range(per_frame):
+            for c in range(channels):
+                if k >= len(got):
+                    break
+                want = expected_sample(index + i, c, rate) >> shift
+                d = abs(got[k] - want)
+                if d:
+                    differing += 1
+                    worst = max(worst, d)
+                k += 1
+        index += per_frame
+    return len(got), want_count, differing, worst
+
+
 def compare(a: pathlib.Path, b: pathlib.Path, width: int, height: int, frames: int):
     """Per-channel max error and PSNR, over the frames both files share.
 
@@ -137,6 +207,10 @@ def main() -> int:
     ap.add_argument("--size", default="1920x1080")
     ap.add_argument("--quality", type=int, default=2)
     ap.add_argument("--alpha", action="store_true")
+    ap.add_argument("--rate", type=int, default=0,
+                    help="audio mix rate; 0 encodes no audio track at all")
+    ap.add_argument("--channels", type=int, default=2)
+    ap.add_argument("--abits", type=int, default=16, help="PCM depth written, 16 or 32")
     args = ap.parse_args()
 
     for tool in ("ffmpeg", "ffprobe"):
@@ -153,6 +227,8 @@ def main() -> int:
     raw_out = args.work / "decoded.rgba"
     corrupted = args.work / "corrupted.mkv"
     raw_corrupt = args.work / "corrupted.rgba"
+    godot_stream = args.work / "godot.raw"
+    audio_back = args.work / "audio.pcm"
 
     print(f"source      {args.source}")
     print(f"            {probe(args.source, 'stream=codec_name,width,height,pix_fmt')}"
@@ -168,11 +244,24 @@ def main() -> int:
         sys.stderr.write("FAIL the source yielded no whole frames\n")
         return 1
 
+    fps = 60
+    encoder_input = raw_in
+    if args.rate:
+        print("\n1b. interleave audio, in Godot's layout")
+        build_godot_stream(raw_in, godot_stream, got_frames, width, height, args.rate, fps,
+                           args.channels)
+        per_frame = args.rate // fps
+        print(f"   {godot_stream.name}: {godot_stream.stat().st_size} bytes, "
+              f"{per_frame} samples/frame/channel following each frame's pixels")
+        encoder_input = godot_stream
+
     print("\n2. encode to the intermediate, over the bus")
-    cmd = [str(args.tui), "-i", str(raw_in), "-s", args.size, "-r", "60",
+    cmd = [str(args.tui), "-i", str(encoder_input), "-s", args.size, "-r", str(fps),
            "-q", str(args.quality), "-frames", str(got_frames), "-nostats"]
     if args.alpha:
         cmd.append("-alpha")
+    if args.rate:
+        cmd += ["-ar", str(args.rate), "-ac", str(args.channels), "-abits", str(args.abits)]
     cmd.append(str(intermediate))
     proc = subprocess.run(cmd, capture_output=True, text=True)
     sys.stdout.write("   " + proc.stdout.strip().replace("\n", "\n   ") + "\n")
@@ -253,6 +342,52 @@ def main() -> int:
         else:
             print(f"   FAIL corruption produced no larger error than the clean encode "
                   f"({worst} against {clean_worst}); this comparison proves nothing")
+            failures += 1
+
+    if args.rate:
+        print("\n6. audio")
+        # Decoded back at the depth it was written, so the comparison is against the samples
+        # that went in rather than against a rescaling of them.
+        codec = "pcm_s16le" if args.abits == 16 else "pcm_s32le"
+        fmt = "s16le" if args.abits == 16 else "s32le"
+        run(["ffmpeg", "-v", "error", "-y", "-i", str(intermediate), "-map", "0:a",
+             "-f", fmt, "-acodec", codec, str(audio_back)])
+        got_n, want_n, differing, worst = compare_audio(
+            audio_back, got_frames, args.rate, fps, args.channels, args.abits)
+        print(f"   decoded samples   {got_n} of {want_n}")
+        print(f"   differing         {differing}")
+        print(f"   worst error       {worst}")
+
+        if got_n != want_n:
+            print(f"   FAIL sample count changed: {got_n} against {want_n}")
+            failures += 1
+        elif differing != 0:
+            # Uncompressed, so this is exact. There is no lossy explanation to fall back on.
+            print(f"   FAIL PCM is not bit-identical: {differing} samples differ")
+            failures += 1
+        else:
+            print("   ok   every sample is bit-identical")
+
+        # THE NEGATIVE CONTROL FOR THE AUDIO COMPARISON. Without it, a comparison that read
+        # zero samples and looped zero times would report 0 differing and pass. The two
+        # channels carry different frequencies so that a channel swap -- which keeps every
+        # value and every count -- is detectable by a comparison that respects ordering.
+        raw = bytearray(audio_back.read_bytes())
+        width_b = args.abits // 8
+        if len(raw) > width_b * 4:
+            at = (len(raw) // width_b // 2) * width_b
+            raw[at] ^= 0xFF
+            damaged = args.work / "audio_damaged.pcm"
+            damaged.write_bytes(bytes(raw))
+            _, _, d_diff, _ = compare_audio(damaged, got_frames, args.rate, fps,
+                                            args.channels, args.abits)
+            if d_diff > 0:
+                print(f"   ok   an altered sample is detected ({d_diff})")
+            else:
+                print("   FAIL a deliberately altered sample went unnoticed")
+                failures += 1
+        else:
+            print("   FAIL too little audio decoded to run the negative control")
             failures += 1
 
     print(f"\n{'PASS' if failures == 0 else 'FAIL'}: {failures} failure(s)")

@@ -3,6 +3,7 @@
   <remote name="weftspun" fetch="https://github.com/weftspun" />
   <remote name="v-sekai-fabric" fetch="https://github.com/v-sekai-fabric" />
   <remote name="laurencelundblade" fetch="https://github.com/laurencelundblade" />
+  <remote name="ftxui" fetch="https://github.com/ArthurSonzogni" />
   <default remote="weftspun" sync-j="4" />
 
   <project name="iceoryx2" path="thirdparty/iceoryx2"
@@ -13,4 +14,25 @@
            revision="refs/tags/v1.6.1" />
   <project name="interactor-cineform" path="interactor-cineform" revision="main" />
   <project name="transport-cineform-tui" path="transport-cineform-tui" revision="main" />
+
+  <!-- WHAT THE TWO PROGRAMS LINK, COMPOSED HERE RATHER THAN SYNCED TWICE.
+       Each program is a manifest root of its own and each lists these, so a checkout made
+       from either one gets a private copy. A deployment needs both programs at once, and
+       two copies of contract-bus in one tree is the drift `wire.hpp` exists to prevent:
+       the four things iceoryx2 compares at connect time would be defined twice.
+
+       So this manifest carries one of each, and the builds are pointed at them through the
+       cache paths both CMakeLists already expose: HARNESS_DIR, INTERACTOR_DIR, FTXUI_DIR.
+       Nothing is copied and nothing is a submodule, which CLAUDE.md blocklists.
+
+       ONE CONTRACT-BUS PIN WINS AND IT IS THIS ONE. interactor-cineform pins
+       b3acc3be2e00cc2fa25d9d325aa7935c187ea0a2 and this manifest pins 4340ea3. A tree holds
+       one revision, so the newer is taken and the older is superseded here rather than in
+       a comment nobody reads at build time. -->
+  <project name="cineform-sdk" path="thirdparty/cineform-sdk"
+           revision="6b66f29b5079bfb708caa53ff4150616c11c5fa4" />
+  <project name="libwebm" path="thirdparty/libwebm"
+           revision="6184f4484a826724b5293837134ab9492261b941" />
+  <project name="FTXUI" path="thirdparty/ftxui" remote="ftxui"
+           revision="182ef70cd4dc1109d06e66361a9da86445928578" />
 </manifest>

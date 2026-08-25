@@ -5,6 +5,35 @@ on one host, in a runtime directory this service owns.
 
     python scripts/up.py
 
+## Where the dependencies come from
+
+    repo sync                       # from the workspace root
+    python scripts/up.py
+
+The four things this service composes are in the workspace's own manifest, at
+`thirdparty/iceoryx2`, `thirdparty/cineform-sdk`, `thirdparty/libwebm` and
+`thirdparty/ftxui` under this directory. `default.xml` here lists the same set and is the
+root for a deployment-only checkout that has no workspace around it.
+
+Both are needed and neither replaces the other. A manifest root's own list is NOT read when
+the project is checked out as one project among ninety-eight, so a workspace sync used to
+give the three programs and nothing they link, and building either one meant a second,
+private checkout of contract-bus. Two copies of that is the drift `wire.hpp` exists to
+prevent, since it defines the four things iceoryx2 compares at connect time.
+
+**Do not run `repo init` inside this directory.** It walks up, finds the workspace client
+and re-points the goal manifest at this project, reporting only that it initialised
+somewhere else. Build against the checkouts that are already there:
+
+    # the encoder, from 3-interactor/interactor-cineform
+    cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5       -DHARNESS_DIR=../../2-contract/bus       -DCINEFORM_DIR=../../7-service/service-cineform/thirdparty/cineform-sdk       -DLIBWEBM_DIR=../../7-service/service-cineform/thirdparty/libwebm
+
+    # the display, from 1-transport/transport-cineform-tui
+    cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release       -DHARNESS_DIR=../../2-contract/bus       -DINTERACTOR_DIR=../../3-interactor/interactor-cineform       -DFTXUI_DIR=../../7-service/service-cineform/thirdparty/ftxui
+
+Measured on Windows 11 with clang 22.1.8, CMake 4.4.2 and Ninja 1.13.2: the encoder is 95
+targets and the display is 71, and both link against one contract-bus checkout.
+
 ## Why a service side at all
 
 `interactor-cineform` encodes and `transport-cineform-tui` displays. Neither of them owns

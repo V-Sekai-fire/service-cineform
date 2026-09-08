@@ -37,6 +37,16 @@ def ffi_library_name() -> str:
     return "libiceoryx2_ffi_c.so"
 
 
+def libclang_dir() -> pathlib.Path | None:
+    """The clang shared library beside the interpreter running this script, if any."""
+    prefix = pathlib.Path(sys.prefix)
+    for candidate in (prefix / "Library" / "bin", prefix / "lib", prefix / "bin"):
+        for name in ("libclang.dll", "libclang.so", "libclang.dylib", "clang.dll"):
+            if (candidate / name).is_file():
+                return candidate
+    return None
+
+
 def build_iceoryx2(run: pathlib.Path, iceoryx2_dir: pathlib.Path) -> pathlib.Path:
     """Builds the FFI shared library, with the runtime directory compiled into it.
 
@@ -59,6 +69,15 @@ def build_iceoryx2(run: pathlib.Path, iceoryx2_dir: pathlib.Path) -> pathlib.Pat
 
     env = dict(os.environ)
     env["IOX2_TEMP_DIRECTORY"] = temp_value
+    # iceoryx2's posix layer generates its bindings with bindgen, which loads a
+    # clang shared library and names LIBCLANG_PATH when it finds none. The
+    # environment that runs this script installs one, so point at that rather
+    # than asking a caller to remember.
+    if "LIBCLANG_PATH" not in env:
+        found = libclang_dir()
+        if found is not None:
+            env["LIBCLANG_PATH"] = str(found)
+            print(f"using LIBCLANG_PATH={found}")
     print(f"building iceoryx2-ffi-c with IOX2_TEMP_DIRECTORY={temp_value}")
     subprocess.run(
         ["cargo", "build", "--release", "-p", "iceoryx2-ffi-c"],

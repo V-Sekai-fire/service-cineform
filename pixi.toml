@@ -1,0 +1,27 @@
+# The deployment's build toolchain, declared because it is a property of the
+# deployment rather than of either program. `scripts/up.py` builds the bus
+# library with cargo and the two programs are built with CMake and Ninja; until
+# now none of the three was declared anywhere and each desk found its own.
+
+[workspace]
+name = "service-cineform"
+version = "0.1.0"
+description = "The CineForm bus, its runtime directory, and the toolchain that builds both programs"
+channels = ["conda-forge"]
+platforms = ["win-64", "linux-64", "osx-arm64"]
+
+[feature.build.dependencies]
+# iceoryx2 declares edition 2024 and rust-version 1.85.
+rust = ">=1.85"
+# iceoryx2's posix layer generates its bindings with bindgen, which loads
+# libclang at build time and names LIBCLANG_PATH when it cannot find one.
+libclang = "*"
+cmake = ">=3.28"
+ninja = ">=1.11"
+python = "3.11.*"
+
+[feature.build.tasks]
+bus = "python scripts/up.py --print-env"
+
+[environments]
+build = { features = ["build"], no-default-feature = true }

@@ -9,7 +9,7 @@
   <project name="iceoryx2" path="thirdparty/iceoryx2"
            revision="a1909f56e30c16b1492e829313389b9439811323" />
   <project name="contract-bus" path="thirdparty/harness" remote="v-sekai-fire"
-           revision="4340ea34394e20b832d9efad66117cae2da2ce7a" />
+           revision="b3acc3be2e00cc2fa25d9d325aa7935c187ea0a2" />
   <project name="QCBOR" path="thirdparty/harness/libs/qcbor" remote="laurencelundblade"
            revision="refs/tags/v1.6.1" />
   <project name="interactor-cineform" path="interactor-cineform" revision="main" />
@@ -25,12 +25,14 @@
        cache paths both CMakeLists already expose: HARNESS_DIR, INTERACTOR_DIR, FTXUI_DIR.
        Nothing is copied and nothing is a submodule, which CLAUDE.md blocklists.
 
-       ONE CONTRACT-BUS PIN WINS AND IT IS THIS ONE. interactor-cineform pins
-       b3acc3be2e00cc2fa25d9d325aa7935c187ea0a2 and this manifest pins 4340ea3. A tree holds
-       one revision, so the newer is taken and the older is superseded here rather than in
-       a comment nobody reads at build time. -->
+       ONE PIN PER DEPENDENCY, AND IT MATCHES WHAT BOTH PROGRAMS PIN. A tree holds one
+       revision, so it must be one both programs build against. contract-bus is b3acc3b,
+       the revision interactor-cineform and transport-cineform-tui both pin: it adds the
+       subscriber buffer depth that progress_bus.hpp sets. cineform-sdk is 6869d78, the
+       arm64 build interactor-cineform pins. An older pin here fails the build of the
+       program that needs the newer one. -->
   <project name="cineform-sdk" path="thirdparty/cineform-sdk"
-           revision="6b66f29b5079bfb708caa53ff4150616c11c5fa4" />
+           revision="6869d78c350f78117dfd04e7a74348c440876cc7" />
   <project name="libwebm" path="thirdparty/libwebm"
            revision="6184f4484a826724b5293837134ab9492261b941" />
   <project name="FTXUI" path="thirdparty/ftxui" remote="ftxui"

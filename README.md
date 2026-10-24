@@ -4,7 +4,7 @@ The CineForm encode service: it stands up the iceoryx2 bus and the encoder on on
 
 ## What it is for
 
-The encoder and the terminal display are two processes that must agree on a shared-memory namespace, a library path and a runtime directory. Those belong to the deployment rather than to either program, so this repository owns them, with the round-trip test that runs against the live bus. RFD 1137 owns the design.
+The encoder and the terminal display are two processes that must agree on a shared-memory namespace, a library path and a runtime directory. Those belong to the deployment rather than to either program, so this repository owns them, with the round-trip test that runs against the live bus. RFD66606-1137 owns the design.
 
 ## Build and run
 
